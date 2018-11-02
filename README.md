@@ -1,6 +1,6 @@
 # R Mining and Visualization
 
-This project uses R to explore a set of data "yeast.data" and operate statistics analysis on it. A model is trained and tested for classifying the data into categories using decision tree. The classification model then is displayed with graphs including decision tree and heatmap showing how the deisions made. Some graphs are produced 
+This project uses R to explore a set of data "yeast.data" and operate statistics analysis on it. A model is trained and tested for classifying the data into categories using decision tree. The classification model then is displayed with graphs including decision tree and heatmap showing how the decisions made.  
 
 ## Built with
 
