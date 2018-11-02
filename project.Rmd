@@ -1,0 +1,205 @@
+---
+title: "IFN509 Project"
+author: "Wai Wing Chan"
+date: "18 May 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+##Task 1: Data Mining
+Before starting any sub-tasks, the data set is imported and seed are set.
+
+```{r}
+#import the data set yeast.data.
+yeast <- read.csv("C:/Users/User/Desktop/yeast.data", sep = "", header = F)
+
+#name headers for yeast data set for easier manipulation
+names(yeast) <- c("Sequence_Name", "mcg", "gvh", "alm", "mit", "erl", "pox", "vac", "nuc", "Localisation_Site")
+
+#generate random numbers of 1234
+set.seed(1234)
+
+```
+
+#Task 1(a)
+Use a 70-30 split to create your training and test data.
+
+```{r}
+
+#create 2 sets of data sampled from yeast data set and assign 70% for training to train a model and 30% for test to evaluate the model
+splitData <- sample(2, nrow(yeast), replace = T, prob = c(0.7, 0.3))
+trainData <- yeast[splitData == 1,]
+testData <- yeast[splitData == 2,]
+
+```
+
+#Task 1(b)
+Use your training data to train a model
+
+```{r}
+#use party library
+library(party)
+
+#create a dataframe to specify the target variable (Localisation_Site) and all other independent variables (mcg, gvh, alm, mit, erl, pox, vac, nuc)
+formula <- Localisation_Site ~mcg + gvh + alm + mit + erl + pox + vac + nuc
+
+#use 'ctree' to build the decision tree model based on the formula configuration
+yeast_ctree <- ctree(formula, data = trainData)
+
+```
+
+#Task 1(c)
+Use your model to predict previously unseen data using the test data. 
+
+Test data is used for this task and a table containing predicted values (in rows) and true values (in columns) of the test data is presented.
+```{r}
+#create the table
+table(predict(yeast_ctree, newdata = testData), testData$Localisation_Site)
+
+```
+
+#Task 1(d)
+Produce a confusion matrix showing your predictions and report the accuracy of your model. 
+
+```{r}
+
+#use caret library
+library(caret)
+
+#output the confusion matrix including evaluation measures like accuracy, sensitivity, specificity and so on
+confusionMatrix(predict(yeast_ctree, newdata = testData), testData$Localisation_Site)
+
+```
+
+As the confusion matrix shows, the accuracy of the model is 0.5926 (around 59.26%), which means out of 432 unseen observations (test data), this model accurately predicted 256 observations. The p-value is < 2.2e-16 which is much smaller than the conventional value of .05. The result is significant. On the other hand, the Kappa value compares the accuracy of the model to that of a random model (Markham, 2014), 0.481 Kappa means this model provides fairly good accuracy.   
+
+##Task 2: Visualization
+
+#Task 2(a)
+Produce a visualization of your classification model and how it makes decisions, when using a 70-30 split. 
+
+```{r, fig.width=30, fig.height=10}
+
+#plot the decision tree out
+plot(yeast_ctree)
+
+```
+
+The decision tree totally has 16 nodes and 34 branches. A node represents the splitting criteria and each of them has 2 splits in this tree. Each branch represents the suggested values split of a node. The root node of the tree is 'alm', it splits into 2 branches by splitting value 0.43 to the second split 'mcg'. The third split criteria is either 'mit' or 'gvh'. 
+
+alm <=0.43 has 4 nodes and 5 leaves whereas alm >0.43 has 12 nodes and 13 leaves.
+
+The tree grows till reaching the target variable - the predicted class that informed by the independent variables - the reference classes/split criteria.  
+
+#Task 2(b)
+Produce a visualization of your confusion matrix as a heatmap. Your heatmap should visualize the predicted variables and normalize these predictions between 0 and 1.
+
+```{r}
+
+library(ggplot2)
+
+#make the decision tree data into data frame
+heatmapData <- as.data.frame(table(predict(yeast_ctree, newdata = testData), testData$Localisation_Site))
+
+#normalize data between 0-1 using Min-max normalisation
+normalized = (heatmapData$Freq-min(heatmapData$Freq))/(max(heatmapData$Freq) - min(heatmapData$Freq))
+
+#replace values of Freq with Normalised values
+heatmapData[,"Freq"] <- normalized
+
+#plot the heatmap out, x axis is the reference class, and y axis is the predicted class. It is filled based on normalized frequency between 0 to 1. The closer to 1, the deeper the color grid. rec
+ggplot(heatmapData) + geom_tile(aes(x=Var1, y=Var2, fill=Freq), colors = "white") + scale_x_discrete(name = "Reference Class", position = "bottom") + scale_y_discrete (name = "Predicted Class") + scale_fill_gradient(breaks=seq(from=-.5, to=4, by=.25), low = "white", high = "midnightblue") + labs(title="Heatmap of The Yeast Classification Tree", fill="Normalized\nFrequency\n")
+
+```
+
+##Task 3: Data Analysis
+#Task 3(a)
+The confusion matrix shows that the classifier has 59.26% accuracy. It successfully predicted 256 cases (256 true positive) out of 432 data points, which also means that there are 40.74% false prediction - around 176 false positive.  
+
+In terms of effectiveness, high accuracy, that is getting the right outcome, brings high effectiveness. In this test, the classifier gives around 59% accuracy which is not that satisfactory in respect of effectiveness but the p-value gained is very small that indicates the model is significant. This classifier has room to improve but it can still be considered for this data set.
+
+The model used all the independent variable (8 variables) as references to predict the target class. The distribution of all the class variables is fully utilized and referenced to produce the final classification. It has done the job it has to do. 
+
+#Task 3(b)
+•    Provide a method to remove a few variables (at least two, more is better) from column 2 to column 9. You should provide a justification to answer why your solution is acceptable. (2 marks) 
+
+To know which variables to keep, we need to do feature selection for the model. The Caret R package provides cross-validation methods for feature selection. This task will first use recursive partitioning to train the model (with cross validation control) and then use variable importance ranking to rank the importance of each variable (column 2 to column 9), so to help to determine which variables to be included for next train.
+
+This method is adopted as below:
+```{r}
+#use caret library
+library(caret)
+
+#set cross validation control parameters (use repeated cross validation, 5 times of resmapling iteration, 3 complete sets of folds to compute)
+control <- trainControl(method = "repeatedcv", number = 5, repeats = 3)
+
+#build the train model of recursive partitioning ("rpart"), column "Sequence_Name" is excluded in this model.
+model <- train(Localisation_Site~., data = yeast [, -which(names(yeast)=="Sequence_Name")], method = "rpart", preProcess = "scale")
+
+#calculate and rank the importance of variables
+importance <- varImp(model, scale = F)
+
+#show the variable importance ranking list
+importance
+
+```
+
+From the above ranking list, the variable with importance greater than 50 will be chosen for the new training mode, which are mit, nuc, alm, mcg, and gvh. 
+
+•    Use a 70-30 split to create a new training model by using your selected independent variables and the target variable “localisation sites”. (2 marks) 
+
+```{r}
+#create a cleaned yeast data set with erl, pox and vac excluded
+yeast_Cleaned <- yeast[, -c(6:8)]
+
+#generate random numbers of 1234
+set.seed(1234)
+
+#use 70-30 split for the new training model 
+splitData <- sample(2, nrow(yeast_Cleaned), replace = T, prob = c(0.7, 0.3))
+trainData2 <- yeast_Cleaned[splitData == 1,]
+testData2 <- yeast_Cleaned[splitData == 2,]
+
+```
+
+Now, create the new model.
+```{r}
+#only "mit", "nuc", "alm", "mcg" and "gvh" are included in the formula this time
+formula2 <- Localisation_Site ~mit + nuc + alm + mcg + gvh 
+
+#use 'ctree' to build the decision tree model based on the above formula2
+yeast_ctree2 <- ctree(formula2, data = trainData2)
+
+#generate the confusion matrix and the statistics for this model
+confusionMatrix(predict(yeast_ctree2, newdata = testData2), testData2$Localisation_Site)
+
+```
+
+•    Discuss your experimental results (i.e., confusion matrix) against the results in Task 2 (b). (2 marks)
+
+Recap the result in Task 2(b):
+
+*<span style="color:blue">As the confusion matrix shows, the accuracy of the model is 0.5926 (around 59.26%), which means out of 432 unseen observations (test data), this model accurately predicted 256 observations. The p-value is < 2.2e-16 which is much smaller than the conventional value of .05. The result is significant. On the other hand, the Kappa value compares the accuracy of the model to that of a random model (Markham, 2014), 0.481 Kappa means this model provides fairly good accuracy.</span>*
+
+The confusion matrix of the new model has a higher accuracy of 0.625 (around 62.5%) than the result in Task 2(b). 270 observations out of 432 unseen observations (testData2), which means 270 true positive, were accurately predicted using this new model. With respect to the p-value, it is the same as the previous test, which means this result is significant as well. The Kappa value of 0.5161 is a bit higher than that of the previous model (0.481), which means this model has slightly better accuracy. 
+To summarize, it is believed that feature selection helped to improve the model performance.
+
+
+#References:
+https://machinelearningmastery.com/feature-selection-with-the-caret-r-package/
+
+http://topepo.github.io/caret/train-models-by-tag.html
+
+http://www.dataschool.io/simple-guide-to-confusion-matrix-terminology/
+
+https://stats.stackexchange.com/questions/82162/cohens-kappa-in-plain-english
+
